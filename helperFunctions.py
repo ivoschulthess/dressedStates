@@ -299,8 +299,37 @@ def getFitCond (path: str, dataset: int, fitCarrierFrq: bool=False, verbose: int
     # offset
     lower.append(-10)
     upper.append(10)
+
+    if verbose>0:
+        print('initial conditions')
+        printParams(p0)
+        print('lower bounds', lower)
+        print('upper bounds', upper)
     
     return p0, (np.asarray(lower), np.asarray(upper))
+
+def printParams(popt: np.ndarray, perr: np.ndarray=None) -> None:
+    '''
+    Print multi-Gaussian parameters
+    '''
+    print('\n(f0, A, s):')
+
+    for j in range((len(popt) - 1) // 3):
+        params = popt[j*3:(j+1)*3]
+
+        if perr is None:
+            print('({:.1f} {:.3f} {:.1f})'.format(*params))
+        else:
+            errs = perr[j*3:(j+1)*3]
+            print('({:.1f} {:.3f} {:.1f}) ± ({:.1f} {:.3f} {:.1f})'
+                  .format(*params, *errs))
+
+    print('\no:')
+
+    if perr is None:
+        print('{:.3f}'.format(popt[-1]))
+    else:
+        print('{:.3f} ± {:.3f}'.format(popt[-1], perr[-1]))
 
 
 ###############################################################################
@@ -324,6 +353,7 @@ def plotResonanceFrequencies (path: str, ax: plt.Axes, verbose: int=0, **kwargs:
     # get actual Larmor frequency from undressed spectrum in [Hz]
     f0 = getF0(path)[0]
 
+    # dressing parameter y
     y = f0 / fd
 
     for i,amp in enumerate(dressAmp):
@@ -333,6 +363,12 @@ def plotResonanceFrequencies (path: str, ax: plt.Axes, verbose: int=0, **kwargs:
         F_SF = data['F_SF']
         Amp = data['Amp']
         vd = data['Vd'][i]
+
+        if verbose>1:
+            fig, at = plt.subplots()
+            at.errorbar(F_SF, Amp[0], Amp[1], fmt='k.')
+            at.set(xlabel='frequency [Hz]', ylabel='spin polarization')
+            plt.show()
         
         # dressing field amplitude in [uT]
         Bd = fieldConversion[0]*vd/1e3
@@ -350,9 +386,9 @@ def plotResonanceFrequencies (path: str, ax: plt.Axes, verbose: int=0, **kwargs:
         BIC = np.empty(2)
         for j,carrier in enumerate([False, True]):
         
-            p0, bounds = getFitCond(path, i, carrier)
+            p0, bounds = getFitCond(path, i, carrier, verbose=verbose)
             
-            popt, pcov = curve_fit(multiGaussFct, F_SF, Amp[0], sigma=Amp[1], absolute_sigma=True, p0=p0, bounds=bounds)
+            popt, pcov = curve_fit(multiGaussFct, F_SF, Amp[0], sigma=Amp[1], absolute_sigma=True, p0=p0, bounds=bounds, maxfev=50_000)
             perr = np.sqrt(np.diag(pcov))
             residuals = Amp[0] - multiGaussFct(F_SF, *popt)
             chi2 = np.sum((residuals / Amp[1])**2)
@@ -376,10 +412,15 @@ def plotResonanceFrequencies (path: str, ax: plt.Axes, verbose: int=0, **kwargs:
         if carrier and verbose>0:
             print('adding dressing-field component\n')
         
-        p0, bounds = getFitCond(path, i, carrier)
+        p0, bounds = getFitCond(path, i, carrier, verbose=verbose)
+            
         popt, pcov = curve_fit(multiGaussFct, F_SF, Amp[0], sigma=Amp[1], absolute_sigma=True, p0=p0, bounds=bounds)
         perr = np.sqrt(np.diag(pcov))
-
+        
+        if verbose>0:
+            print('fitted parameters')
+            printParams(popt, perr)
+        
         baselinePolarization = popt[-1]
 
         # separate Gaussian parameters from the common offset
@@ -405,8 +446,7 @@ def plotResonanceFrequencies (path: str, ax: plt.Axes, verbose: int=0, **kwargs:
         resFrqErr = resFrqErr[mask]
 
         if baselinePolarization >= 0.1:
-            ax.errorbar(np.full_like(resFrq, x), resFrq, resFrqErr, fmt='k.', ms=8)
-
+            ax.errorbar(np.full_like(resFrq, x), resFrq, resFrqErr, fmt='k.', ms=kwargs.get('ms') if 'ms' in kwargs else 8)
 
 def plotTransitionFrequencies (ax: plt.Axes, X: np.ndarray, y: float, fd: float, **kwargs: object) -> None:
     '''
