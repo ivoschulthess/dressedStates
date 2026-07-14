@@ -244,7 +244,7 @@ def getFitCond (path: str, dataset: int, fitCarrierFrq: bool=False, verbose: int
     vd = data['Vd'][dataset]
     
     # get the baseline
-    O0 = Amp[0][F_SF>2700].mean()
+    O0 = Amp[0][F_SF>0.9*F_SF.max()].mean()
     
     # dressing field amplitude in [uT]
     Bd = fieldConversion[0] * vd/1e3
@@ -454,7 +454,7 @@ def plotDensityMap (path: str, ax: plt.Axes, baselineCorr: bool=True, **kwargs: 
         sig = np.load(file)['Amp'][0]
         
         if baselineCorr:
-            sigMean = sig[F_SF>2700].mean()
+            sigMean = sig[F_SF>0.9*F_SF.max()].mean()
             signal[n] = sig-sigMean+1
         else:
             signal[n] = sig
