@@ -417,18 +417,15 @@ def plotTransitionFrequencies (ax: plt.Axes, X: np.ndarray, y: float, fd: float,
 
     EV, sign, _ = calcEnergyLevels_X(X, y, Ncalc, verbose=1)
 
-    unitConv = 1
-    if 'unit' in kwargs and kwargs.get('unit')=='kHz':
-        unitConv = 1e-3
-
     for i in np.arange(Ncalc//2):
         dE = abs(fd *(EV[:,Ncalc//2+i]-EV[:,Ncalc//2-i-1])*sign[i])
+        dE -= 2*fd # shift by two periods for proper plotting
 
         if 'dualColor' in kwargs and kwargs.get('dualColor')==True:
-            ax.plot(X, unitConv*(dE-2*fd), zorder=1, c='{}'.format(lc[4] if i%2==0 else lc[2]), lw=1)
+            ax.plot(X, dE, zorder=1, c='{}'.format(lc[4] if i%2==0 else lc[2]), lw=1)
         else:
-            ax.plot(X, unitConv*(dE-2*fd), zorder=1, c='k', lw=2, alpha=0.25)
-            ax.plot(X, unitConv*(dE-2*fd), zorder=1, c='w', lw=1.5, alpha=0.25)
+            ax.plot(X, dE, zorder=1, c='k', lw=2, alpha=0.25)
+            ax.plot(X, dE, zorder=1, c='w', lw=1.5, alpha=0.25)
         
         
 def plotDensityMap (path: str, ax: plt.Axes, baselineCorr: bool=True, **kwargs: object) -> None:
@@ -448,8 +445,8 @@ def plotDensityMap (path: str, ax: plt.Axes, baselineCorr: bool=True, **kwargs: 
     # calculate the dressing parameter array
     X = np.linspace(0, dressAmp[-1], 1001) * fieldConversion[0]*gamma_p/2/np.pi/fd/1e9
 
-    # spin-flip field frequency in [kHz]
-    F_SF = np.load(files[0])['F_SF'] / 1e3
+    # spin-flip field frequency in [Hz]
+    F_SF = np.load(files[0])['F_SF']
 
     # get signal data
     signal = np.zeros((len(files), len(F_SF)))
@@ -457,7 +454,7 @@ def plotDensityMap (path: str, ax: plt.Axes, baselineCorr: bool=True, **kwargs: 
         sig = np.load(file)['Amp'][0]
         
         if baselineCorr:
-            sigMean = sig[F_SF>2.7].mean()
+            sigMean = sig[F_SF>2700].mean()
             signal[n] = sig-sigMean+1
         else:
             signal[n] = sig
@@ -465,7 +462,7 @@ def plotDensityMap (path: str, ax: plt.Axes, baselineCorr: bool=True, **kwargs: 
     signal = np.flip(signal.T, axis=0)
 
     # plot the density map
-    extent=(X.min(), X.max(), 0, 3)
+    extent=(X.min(), X.max(), 0, F_SF[-1])
     cs = ax.imshow(signal, extent=extent, 
                    aspect='auto', vmin=-0.75, vmax=1.05, cmap='RdBu', interpolation='gaussian')
 
