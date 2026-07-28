@@ -11,11 +11,8 @@ from scipy.optimize import curve_fit
 # gyromagnetic ratio in [rad/s/T]
 gamma_p = physical_constants['proton gyromag. ratio'][0]
 
-# vacuum magnetic permeability in [N/A**2]
-mu_0 = physical_constants['vacuum mag. permeability'][0]
-
-# field conversion of the dressing field in [uT/Vpp]
-fieldConversion = np.array([17.90142671025224, 0.07157374413471178])
+# field conversion of the dressing field in [uT/V]
+fieldConversion = np.array([17.901427, 0.071574])
 
 # color scheme of lines
 lc = ['deepskyblue', 'orange', 'yellowgreen', 'tomato', 'orchid']
@@ -76,6 +73,13 @@ def getF0 (path: str, verbose: int=0) -> tuple[float, float]:
 def diagonalizeHamiltonian (x: float, y: float, N: int=50, n: int=0, model: str='QRM', **kwargs: object) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     '''
     Define and diagonalize the Hamiltonian of the Jaynes-Cummings or Quantum-Rabi model
+    return:
+        eigval: np.ndarray
+            eigenvalues of the diagonalized Hamiltonian
+        eigvec: np.ndarray
+            eigenvectors of the diagonalized Hamiltonian
+        H: np.ndarray
+            Hamiltonian matrix before diagonalization
     '''
     if (N-2) % 4 != 0:
         raise ValueError('the following condition has to be fulfilled: (N-2)%4==0')
@@ -140,7 +144,7 @@ def calcSpectrum (E: np.ndarray, V: np.ndarray, fd: float, N: int=50, full: bool
 
         return Fij, Mij
 
-    # Compute only the relevant transition amplitudes between dressed states
+    # Compute only the transition amplitudes between populated dressed states
     else:
         Fij = np.zeros(N//2)
         Mij = np.zeros(N//2)
@@ -156,7 +160,7 @@ def calcSpectrum (E: np.ndarray, V: np.ndarray, fd: float, N: int=50, full: bool
         return Fij, Mij
 
 
-def calcEnergyLevels_X (X: np.ndarray, y: float, N: int=50, n: int=0, verbose: int=0) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+def calcEnergyLevels_X (X: np.ndarray, y: float, N: int=50, n: int=0,  model: str='QRM', verbose: int=0) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     '''
     Calculate the energy levels / eigenvalues of the Hamiltonian
     '''
@@ -182,12 +186,21 @@ def calcEnergyLevels_X (X: np.ndarray, y: float, N: int=50, n: int=0, verbose: i
         off_1[0::2] = 0
         off_3 = np.ones(N-3)/4
         off_3[1::2] = 0
-        Vx = (sp.sparse.diags(off_1, offsets=1).toarray()
-              + sp.sparse.diags(off_3, offsets=3).toarray() 
-              + sp.sparse.diags(off_1, offsets=-1).toarray() 
-              + sp.sparse.diags(off_3, offsets=-3).toarray())
+        
+        # create the interaction matrix depending on the model
+        if model=='QRM':
+            Vx = (sp.sparse.diags(off_1, offsets=1).toarray()
+                  + sp.sparse.diags(off_3, offsets=3).toarray() 
+                  + sp.sparse.diags(off_1, offsets=-1).toarray() 
+                  + sp.sparse.diags(off_3, offsets=-3).toarray())
+        elif model=='JCM':
+            Vx = (sp.sparse.diags(off_1, offsets=1).toarray()
+                  + sp.sparse.diags(off_1, offsets=-1).toarray())
+        else:
+            raise ValueError('only QRM and JCM are implemented')     
+        
         Vx = x * Vx
-
+        
         # create the full Hamiltonian matrix
         H = H0 + Vx
 
@@ -233,7 +246,9 @@ def calcEnergyLevels_X (X: np.ndarray, y: float, N: int=50, n: int=0, verbose: i
 
 
 def getFitCond (path: str, dataset: int, fitCarrierFrq: bool=False, verbose: int=0) -> tuple[np.ndarray, tuple[np.ndarray, np.ndarray]]:
-
+    '''
+    get the initial conditions and boundary conditions for the spectral fit
+    '''
     # get dressing frequency from path
     fd = int(path.split('_')[-1][2:-3])
     
@@ -357,6 +372,9 @@ def plotResonanceFrequencies (path: str, ax: plt.Axes, verbose: int=0, **kwargs:
     y = f0 / fd
 
     for i,amp in enumerate(dressAmp):
+
+        if verbose>0:
+            print(f'i = {i}, amp = {amp}')
     
         # load data
         data = np.load(path+'dressedStates_{:02d}.npz'.format(i))
