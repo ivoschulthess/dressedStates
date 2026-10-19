@@ -525,4 +525,5 @@ def plotDensityMap (path: str, ax: plt.Axes, baselineCorr: bool=True, **kwargs: 
                    aspect='auto', vmin=-0.75, vmax=1.05, cmap='RdBu', interpolation='gaussian')
 
     # plot the colorbar
-    cb = plt.colorbar(cs, pad=0.02, label='spin polarization')
+    if kwargs.get('colorbar', True):
+        cb = plt.colorbar(cs, pad=0.02, label='spin polarization')
